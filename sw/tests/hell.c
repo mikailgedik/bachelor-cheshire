@@ -31,14 +31,22 @@
 #define FG_COLOR_PALETTE  0x400
 #define BG_COLOR_PALETTE  0x800
 
-const uint8_t is_in_text_mode = 1;
+const uint8_t is_in_text_mode = 0;
 
 const uint32_t make_animation = 0;
 const uint32_t arr = 0x81000000;
+/*
 const uint32_t pixtot = (1056<<16) + 628;
 const uint32_t pixact = (800<<16) + 600;
 const uint32_t front_porch = (40<<16) + 1;
 const uint32_t sync_times = ((128<<16) + 4) | (1<<31) | (1<<15);
+*/
+
+const uint32_t pixtot = (1040<<16) + 666;
+const uint32_t pixact = (800<<16) + 600;
+const uint32_t front_porch = (56<<16) + 37;
+const uint32_t sync_times = ((120<<16) + 6) | (1<<31) | (1<<15);
+
 const uint16_t cols = 90, rows = 35;
 
 void wts(int idx, uint32_t val) {
@@ -174,7 +182,7 @@ void make_video(volatile uint8_t * const target, int time) {
             int ym = y - 300;
             int d = xm*xm + ym*ym;
             if(radius2 > d) {
-                setpx(ptr, 0xff00ff);
+                setpx(ptr, 0x0000ff);
             } else if (orad > d) {
                 setpx(ptr, 0x00ff00);
             } else {
@@ -198,15 +206,35 @@ void floating_text(volatile uint16_t * target, int time) {
     fence();
 }
 
+void set_text(volatile uint16_t * target, char * text) {
+    while(*text != 0) {
+        *target = ((0xf) << 8) | *text; 
+        text += 1;
+        target += 1;
+    }
+
+    fence();
+}
+
+void into_str(char* d, uint8_t s) {
+    d[0] = (s / 100) % 10 + '0';
+    d[1] = (s / 10) % 10 + '0';
+    d[2] = (s / 1) % 10 + '0';
+}
+
 int main(void) {
     uint32_t rtc_freq = *reg32(&__base_regs, CHESHIRE_RTC_FREQ_REG_OFFSET);
     uint64_t reset_freq = clint_get_core_freq(rtc_freq, 2500);
-/*    
+
+    volatile uint32_t * vga_disabler = reg32(&__base_regs, CHESHIRE_SCRATCH_0_REG_OFFSET + CHESHIRE_VGA_SELECT_REG_OFFSET);
+    volatile uint32_t * refill_thrsh = reg32(AXI2HDMI_BASE, FIFO_REFILL_THRESHOLD);
+    volatile uint32_t * max_refill = reg32(AXI2HDMI_BASE, FIFI_MAX_REFILL_AMOUNT);
+    *max_refill = 32;
+
     char str[] = "Hell!\r\n";
     uart_init(&__base_uart, reset_freq, __BOOT_BAUDRATE);
     uart_write_str(&__base_uart, str, sizeof(str));
     uart_write_flush(&__base_uart);
-*/
     
     for(int i = 3; i < 16; i++)  {
         wts(i, -1);
@@ -225,26 +253,66 @@ int main(void) {
 
     if(make_animation) {
         if(is_in_text_mode == 0) {
-            for(int x = 0; x != -1; x++)
+            for(int x = 0; x < 0x80; x++) {
                 make_video(arr, x);
+            }
         } else {
-            for(int x = 0; x != -1; x++)
+            for(int x = 0; x < 0x10; x++) {
                 floating_text(arr, x);
+            }
         }
     }
 
-    //This is here so that the sim continues to go on a bit
-    volatile uint32_t * vga_disabler = reg32(&__base_regs, CHESHIRE_SCRATCH_0_REG_OFFSET + CHESHIRE_VGA_SELECT_REG_OFFSET);
-    volatile uint32_t * refill_thrsh = reg32(AXI2HDMI_BASE, FIFO_REFILL_THRESHOLD);
-    volatile uint32_t * max_refill = reg32(AXI2HDMI_BASE, FIFI_MAX_REFILL_AMOUNT);
+    uart_write_str(&__base_uart, str, sizeof(str));
+    uart_write_flush(&__base_uart);
 
+    volatile uint16_t * ptr = arr;
+    char c = '9';
+    uint32_t cntr = 0;
+    while(c != 'q') {
+        if(uart_read_ready(&__base_uart)) {
+            char num [] = "abc\r\n";
+            c = uart_read(&__base_uart);
+            if(c >= '0' && c <= '9') {
+                *max_refill = 1 + (c - '0') * 2;
+            } else {
+                *refill_thrsh = 1 + (c - 'a') * 4;
+            }
+            char s1 [] = "Max refill: \r\n";
+            char s2 [] = "Thresh: \r\n";
+
+            uart_write_str(&__base_uart, s1, sizeof(s1));
+            into_str(num , *max_refill);
+            uart_write_str(&__base_uart, num, sizeof(num));
+            uart_write_str(&__base_uart, s2, sizeof(s2));
+            into_str(num , *refill_thrsh);
+            uart_write_str(&__base_uart, num, sizeof(num));
+            uart_write_flush(&__base_uart);
+        }
+        if((cntr++ / (10 *0xff0)) % 2 == 0) {
+            *ptr = c + (0xf000);
+        } else {
+            *ptr = c + (0x0f00);
+        }
+
+        
+        fence();
+    }
+    
+    char b [] = "done\r\n";
+    uart_write_str(&__base_uart, b, sizeof(b));
+    uart_write_flush(&__base_uart);
+
+    //This is here so that the sim continues to go on a bit
     for(uint32_t i = 0; i < 0x80000; i++) {
         wts(7, i);
         //Play a bit around with maximal refill size
-        *max_refill = 5 + ((i / 0x00800) % 2) * 5;
+        //*max_refill = 5 + ((i / 0x00800) % 2) * 10;
         //Uncomment this to check whether peripheral can be replaced by axi2vga
         //*vga_disabler = (i / 0x00800) % 2;
     }
+
+
 
     return 0;
 }
