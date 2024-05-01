@@ -15,6 +15,10 @@
   model = "eth,cheshire";
 
   chosen {
+    #address-cells = <2>;
+    #size-cells = <2>;
+    ranges;
+    bootargs = "console=ttyS0,115200 console=tty0";
     stdout-path = "/soc/serial@3002000:115200";
     framebuffer0: framebuffer@A0000000 {
       compatible = "simple-framebuffer"; 
@@ -100,9 +104,9 @@
       compatible = "eth,axi-vga";
       reg = <0x0 0x3007000 0x0 0x1000>;
     };
-    axi2hdmi: vga@3008000 {
+    axi2hdmi: vga@3009000 {
       compatible = "eth,axi-vga";
-      reg = <0x0 0x3008000 0x0 0x1000>;
+      reg = <0x0 0x3009000 0x0 0x1000>;
     };
     clint@2040000 {
       compatible = "riscv,clint0";
