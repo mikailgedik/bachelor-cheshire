@@ -637,7 +637,7 @@ package cheshire_pkg;
     VgaMaxReadTxns    : 24,
 
     //Axi2Hdmi
-    Axi2HdmiScFifoDepth  : 64,
+    Axi2HdmiScFifoDepth  : 32,
     Axi2HdmiDcFifoDepth  : 8,
 
     // Serial Link: map other chip's lower 32bit to 'h1_000_0000
