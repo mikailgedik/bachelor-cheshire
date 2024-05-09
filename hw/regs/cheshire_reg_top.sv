@@ -163,6 +163,12 @@ module cheshire_reg_top #(
   logic vga_select_qs;
   logic vga_select_wd;
   logic vga_select_we;
+  logic [7:0] axi2hdmi_clock_config_divider_qs;
+  logic [7:0] axi2hdmi_clock_config_divider_wd;
+  logic axi2hdmi_clock_config_divider_we;
+  logic axi2hdmi_clock_config_selector_qs;
+  logic axi2hdmi_clock_config_selector_wd;
+  logic axi2hdmi_clock_config_selector_we;
 
   // Register instances
 
@@ -965,9 +971,63 @@ module cheshire_reg_top #(
   );
 
 
+  // R[axi2hdmi_clock_config]: V(False)
+
+  //   F[divider]: 7:0
+  prim_subreg #(
+    .DW      (8),
+    .SWACCESS("RW"),
+    .RESVAL  (8'h0)
+  ) u_axi2hdmi_clock_config_divider (
+    .clk_i   (clk_i    ),
+    .rst_ni  (rst_ni  ),
+
+    // from register interface
+    .we     (axi2hdmi_clock_config_divider_we),
+    .wd     (axi2hdmi_clock_config_divider_wd),
+
+    // from internal hardware
+    .de     (1'b0),
+    .d      ('0  ),
+
+    // to internal hardware
+    .qe     (),
+    .q      (reg2hw.axi2hdmi_clock_config.divider.q ),
+
+    // to register interface (read)
+    .qs     (axi2hdmi_clock_config_divider_qs)
+  );
 
 
-  logic [23:0] addr_hit;
+  //   F[selector]: 8:8
+  prim_subreg #(
+    .DW      (1),
+    .SWACCESS("RW"),
+    .RESVAL  (1'h0)
+  ) u_axi2hdmi_clock_config_selector (
+    .clk_i   (clk_i    ),
+    .rst_ni  (rst_ni  ),
+
+    // from register interface
+    .we     (axi2hdmi_clock_config_selector_we),
+    .wd     (axi2hdmi_clock_config_selector_wd),
+
+    // from internal hardware
+    .de     (1'b0),
+    .d      ('0  ),
+
+    // to internal hardware
+    .qe     (),
+    .q      (reg2hw.axi2hdmi_clock_config.selector.q ),
+
+    // to register interface (read)
+    .qs     (axi2hdmi_clock_config_selector_qs)
+  );
+
+
+
+
+  logic [24:0] addr_hit;
   always_comb begin
     addr_hit = '0;
     addr_hit[ 0] = (reg_addr == CHESHIRE_SCRATCH_0_OFFSET);
@@ -994,6 +1054,7 @@ module cheshire_reg_top #(
     addr_hit[21] = (reg_addr == CHESHIRE_LLC_SIZE_OFFSET);
     addr_hit[22] = (reg_addr == CHESHIRE_VGA_PARAMS_OFFSET);
     addr_hit[23] = (reg_addr == CHESHIRE_VGA_SELECT_OFFSET);
+    addr_hit[24] = (reg_addr == CHESHIRE_AXI2HDMI_CLOCK_CONFIG_OFFSET);
   end
 
   assign addrmiss = (reg_re || reg_we) ? ~|addr_hit : 1'b0 ;
@@ -1024,7 +1085,8 @@ module cheshire_reg_top #(
                (addr_hit[20] & (|(CHESHIRE_PERMIT[20] & ~reg_be))) |
                (addr_hit[21] & (|(CHESHIRE_PERMIT[21] & ~reg_be))) |
                (addr_hit[22] & (|(CHESHIRE_PERMIT[22] & ~reg_be))) |
-               (addr_hit[23] & (|(CHESHIRE_PERMIT[23] & ~reg_be)))));
+               (addr_hit[23] & (|(CHESHIRE_PERMIT[23] & ~reg_be))) |
+               (addr_hit[24] & (|(CHESHIRE_PERMIT[24] & ~reg_be)))));
   end
 
   assign scratch_0_we = addr_hit[0] & reg_we & !reg_error;
@@ -1121,6 +1183,12 @@ module cheshire_reg_top #(
 
   assign vga_select_we = addr_hit[23] & reg_we & !reg_error;
   assign vga_select_wd = reg_wdata[0];
+
+  assign axi2hdmi_clock_config_divider_we = addr_hit[24] & reg_we & !reg_error;
+  assign axi2hdmi_clock_config_divider_wd = reg_wdata[7:0];
+
+  assign axi2hdmi_clock_config_selector_we = addr_hit[24] & reg_we & !reg_error;
+  assign axi2hdmi_clock_config_selector_wd = reg_wdata[8];
 
   // Read data return
   always_comb begin
@@ -1235,6 +1303,11 @@ module cheshire_reg_top #(
 
       addr_hit[23]: begin
         reg_rdata_next[0] = vga_select_qs;
+      end
+
+      addr_hit[24]: begin
+        reg_rdata_next[7:0] = axi2hdmi_clock_config_divider_qs;
+        reg_rdata_next[8] = axi2hdmi_clock_config_selector_qs;
       end
 
       default: begin

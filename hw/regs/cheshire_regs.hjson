@@ -140,6 +140,15 @@
         { bits: "0:0", name: "select", desc: "Select VGA implementation - 0: VGA, 1: PAPER." }
       ]
     }
+    { name:     "axi2hdmi_clock_config"
+      desc:     "Integer clock selector/divider for axi2hdmi"
+      swaccess: "rw"
+      hwaccess: "hro"
+      fields: [
+        { bits: "7:0", name: "divider", desc: "Divider quotient of the axi clock" }
+        { bits: "8:8", name: "selector", desc: "Selects the clock source (either divided AXI Busclock (0) or user-provided external clock (1))" }
+      ]
+    }
 
   ]
 }

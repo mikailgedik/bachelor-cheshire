@@ -18,6 +18,15 @@ package cheshire_reg_pkg;
   } cheshire_reg2hw_vga_select_reg_t;
 
   typedef struct packed {
+    struct packed {
+      logic [7:0]  q;
+    } divider;
+    struct packed {
+      logic        q;
+    } selector;
+  } cheshire_reg2hw_axi2hdmi_clock_config_reg_t;
+
+  typedef struct packed {
     logic [1:0]  d;
   } cheshire_hw2reg_boot_mode_reg_t;
 
@@ -96,7 +105,8 @@ package cheshire_reg_pkg;
 
   // Register -> HW type
   typedef struct packed {
-    cheshire_reg2hw_vga_select_reg_t vga_select; // [0:0]
+    cheshire_reg2hw_vga_select_reg_t vga_select; // [9:9]
+    cheshire_reg2hw_axi2hdmi_clock_config_reg_t axi2hdmi_clock_config; // [8:0]
   } cheshire_reg2hw_t;
 
   // HW -> register type
@@ -135,6 +145,7 @@ package cheshire_reg_pkg;
   parameter logic [BlockAw-1:0] CHESHIRE_LLC_SIZE_OFFSET = 7'h 54;
   parameter logic [BlockAw-1:0] CHESHIRE_VGA_PARAMS_OFFSET = 7'h 58;
   parameter logic [BlockAw-1:0] CHESHIRE_VGA_SELECT_OFFSET = 7'h 5c;
+  parameter logic [BlockAw-1:0] CHESHIRE_AXI2HDMI_CLOCK_CONFIG_OFFSET = 7'h 60;
 
   // Reset values for hwext registers and their fields
   parameter logic [1:0] CHESHIRE_BOOT_MODE_RESVAL = 2'h 0;
@@ -170,11 +181,12 @@ package cheshire_reg_pkg;
     CHESHIRE_HW_FEATURES,
     CHESHIRE_LLC_SIZE,
     CHESHIRE_VGA_PARAMS,
-    CHESHIRE_VGA_SELECT
+    CHESHIRE_VGA_SELECT,
+    CHESHIRE_AXI2HDMI_CLOCK_CONFIG
   } cheshire_id_e;
 
   // Register width information to check illegal writes
-  parameter logic [3:0] CHESHIRE_PERMIT [24] = '{
+  parameter logic [3:0] CHESHIRE_PERMIT [25] = '{
     4'b 1111, // index[ 0] CHESHIRE_SCRATCH_0
     4'b 1111, // index[ 1] CHESHIRE_SCRATCH_1
     4'b 1111, // index[ 2] CHESHIRE_SCRATCH_2
@@ -198,7 +210,8 @@ package cheshire_reg_pkg;
     4'b 0011, // index[20] CHESHIRE_HW_FEATURES
     4'b 1111, // index[21] CHESHIRE_LLC_SIZE
     4'b 0111, // index[22] CHESHIRE_VGA_PARAMS
-    4'b 0001  // index[23] CHESHIRE_VGA_SELECT
+    4'b 0001, // index[23] CHESHIRE_VGA_SELECT
+    4'b 0011  // index[24] CHESHIRE_AXI2HDMI_CLOCK_CONFIG
   };
 
 endpackage

@@ -1711,6 +1711,70 @@ module cheshire_soc import cheshire_pkg::*; #(
     logic [23:0] axi2hdmi_colors;
     logic axi2hdmi_hsync, axi2hdmi_vsync;
 
+    //TODO attach the external pixel clk to somewhere
+    logic axi2hdmi_external_pixel_clk;
+    assign axi2hdmi_external_pixel_clk = 'X;
+
+    logic axi2hdmi_divided_axi_c, axi2hdmi_pixel_c, axi2hdmi_pixel_rst_n;
+
+    //TODO the reset signal should maybe be synchronized with the axi2hdmi_pixel_c
+    assign axi2hdmi_pixel_rst_n = rst_ni;
+
+    //We have to keep the input stable for quite some time
+    logic [7:0] axi2hdmi_clock_div_q, axi2hdmi_clock_div_d;
+    logic       axi2hdmi_clk_div_ready, axi2hdmi_clk_div_valid;
+    typedef enum {idle, loading_to_clk_div} axi2hdmi_clk_div_status_t;
+    axi2hdmi_clk_div_status_t axi2hdmi_clk_div_status_q, axi2hdmi_clk_div_status_d;
+    
+    assign axi2hdmi_clk_div_valid = (axi2hdmi_clk_div_status_q == loading_to_clk_div);
+
+    always_comb begin
+      axi2hdmi_clk_div_status_d = axi2hdmi_clk_div_status_q;
+      axi2hdmi_clock_div_d = axi2hdmi_clock_div_q;
+      if(axi2hdmi_clk_div_status_q == loading_to_clk_div) begin
+        //Leave the clock divider stable! Do not change anything
+        //until transaction has happened
+        if(axi2hdmi_clk_div_ready) begin
+          //Transaction is happening; go back to idle
+          axi2hdmi_clk_div_status_d = idle;
+        end
+      end else begin
+        axi2hdmi_clock_div_d = reg_reg2hw.axi2hdmi_clock_config.divider.q;
+        if(axi2hdmi_clock_div_d != axi2hdmi_clock_div_q) begin
+          //Go and load new value to clock divider
+          axi2hdmi_clk_div_status_d = loading_to_clk_div;
+        end
+      end
+    end
+
+    always_ff @( posedge clk_i ) begin : axi2hdmi_clock_div_getter
+      axi2hdmi_clk_div_status_q <= axi2hdmi_clk_div_status_d;
+      axi2hdmi_clock_div_q      <= axi2hdmi_clock_div_d;
+    end
+
+    clk_int_div#(
+      .DIV_VALUE_WIDTH(8),
+      .DEFAULT_DIV_VALUE(1),
+      .ENABLE_CLOCK_IN_RESET(1'b1)
+    ) axi2hdmi_clk_div (
+      .clk_i(clk_i),
+      .rst_ni(rst_ni),
+      .en_i(1'b1),
+      .test_mode_en_i(1'b0),
+      .div_i(axi2hdmi_clock_div_q),
+      .div_valid_i(axi2hdmi_clk_div_valid),
+      .div_ready_o(axi2hdmi_clk_div_ready),
+      .clk_o(axi2hdmi_divided_axi_c)
+    );
+
+    tc_clk_mux2#(
+    ) axi2hdmi_clock_selector (
+      .clk0_i(axi2hdmi_divided_axi_c),
+      .clk1_i(axi2hdmi_external_pixel_clk),
+      .clk_sel_i(reg_reg2hw.axi2hdmi_clock_config.selector.q),
+      .clk_o(axi2hdmi_pixel_c)
+    );
+
     reg_to_axi#(
       .DataWidth(32),
       .reg_req_t(reg_req_t),
@@ -1774,6 +1838,7 @@ module cheshire_soc import cheshire_pkg::*; #(
       .SC_FIFO_DEPTH(Cfg.Axi2HdmiScFifoDepth),
       .FONT_MEMINIT_FILE("font_meminit.txt"),
       .XILINX(0),
+      .ONE_CLOCK_DOMAIN(0),
       .axi_req_t(axi_mst_req_t),
       .axi_resp_t(axi_mst_rsp_t),
       .axi_lite_req_t(axi2hdmi_axi_lite_req_t),
@@ -1788,8 +1853,8 @@ module cheshire_soc import cheshire_pkg::*; #(
       .axi_lite_req_i(axi2hdmi_axi_lite_req),
       .axi_lite_resp_o(axi2hdmi_axi_lite_resp),
       // Pixel Data interface
-      .PixelClk_CI(clk_i),
-      .PxClkRst_RBI(rst_ni),
+      .PixelClk_CI(axi2hdmi_pixel_c),
+      .PxClkRst_RBI(axi2hdmi_pixel_rst_n),
       
       .DOut_RGB_DO(axi2hdmi_colors),
       .DE_RGB_SO(axi2hdmi_output_enabled),
