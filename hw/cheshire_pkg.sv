@@ -168,6 +168,7 @@ package cheshire_pkg;
     // Most parameters are set during runtime
     dw_bt   Axi2HdmiScFifoDepth;
     dw_bt   Axi2HdmiDcFifoDepth;
+    bit     Axi2HdmiCut;
     // Parameters for Serial Link
     dw_bt   SlinkMaxTxnsPerId;
     dw_bt   SlinkMaxUniqIds;
@@ -639,6 +640,7 @@ package cheshire_pkg;
     //Axi2Hdmi
     Axi2HdmiScFifoDepth  : 32,
     Axi2HdmiDcFifoDepth  : 8,
+    Axi2HdmiCut          : 1,
 
     // Serial Link: map other chip's lower 32bit to 'h1_000_0000
     SlinkMaxTxnsPerId : 4,

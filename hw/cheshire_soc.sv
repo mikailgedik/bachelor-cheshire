@@ -1702,8 +1702,8 @@ module cheshire_soc import cheshire_pkg::*; #(
     
     axi2hdmi_axi_cmd_req_t axi2hdmi_axi_cmd_req;
     axi2hdmi_axi_cmd_resp_t axi2hdmi_axi_cmd_resp;
-    axi2hdmi_axi_lite_req_t axi2hdmi_axi_lite_req;
-    axi2hdmi_axi_lite_resp_t axi2hdmi_axi_lite_resp;
+    axi2hdmi_axi_lite_req_t axi2hdmi_axi_lite_req, axi2hdmi_axi_lite_cut_req;
+    axi2hdmi_axi_lite_resp_t axi2hdmi_axi_lite_resp, axi2hdmi_axi_lite_cut_resp;
 
     axi_mst_req_t axi_axi2hdmi_req;
 
@@ -1815,6 +1815,24 @@ module cheshire_soc import cheshire_pkg::*; #(
       .mst_resp_i(axi2hdmi_axi_lite_resp)
     );
 
+    axi_cut #(
+      .Bypass     ( ~Cfg.Axi2HdmiCut  ),
+      .aw_chan_t  ( axi2hdmi_axi_lite_aw_chan_t ),
+      .w_chan_t   ( axi2hdmi_axi_lite_w_chan_t  ),
+      .b_chan_t   ( axi2hdmi_axi_lite_b_chan_t  ),
+      .ar_chan_t  ( axi2hdmi_axi_lite_ar_chan_t ),
+      .r_chan_t   ( axi2hdmi_axi_lite_r_chan_t  ),
+      .axi_req_t  ( axi2hdmi_axi_lite_req_t     ),
+      .axi_resp_t ( axi2hdmi_axi_lite_resp_t    )
+    ) i_axi2hdmi_axi_lite_cut (
+      .clk_i,
+      .rst_ni,
+      .slv_req_i  ( axi2hdmi_axi_lite_req  ),
+      .slv_resp_o ( axi2hdmi_axi_lite_resp ),
+      .mst_req_o  ( axi2hdmi_axi_lite_cut_req  ),
+      .mst_resp_i ( axi2hdmi_axi_lite_cut_resp )
+    );
+
     assign axi2hdmi_hsync_o  = axi2hdmi_hsync;
     assign axi2hdmi_vsync_o  = axi2hdmi_vsync;
     assign axi2hdmi_red_o    = axi2hdmi_output_enabled ? axi2hdmi_colors[23:16]   : '0;
@@ -1850,8 +1868,8 @@ module cheshire_soc import cheshire_pkg::*; #(
       .axi_req_o(axi_axi2hdmi_req),
       .axi_resp_i(axi_in_rsp[AxiIn.axi2hdmi]),
       // AXI lite slave, r/w
-      .axi_lite_req_i(axi2hdmi_axi_lite_req),
-      .axi_lite_resp_o(axi2hdmi_axi_lite_resp),
+      .axi_lite_req_i(axi2hdmi_axi_lite_cut_req),
+      .axi_lite_resp_o(axi2hdmi_axi_lite_cut_resp),
       // Pixel Data interface
       .PixelClk_CI(axi2hdmi_pixel_c),
       .PxClkRst_RBI(axi2hdmi_pixel_rst_n),
