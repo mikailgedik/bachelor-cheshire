@@ -17,7 +17,7 @@ module vip_cheshire_soc import cheshire_pkg::*; #(
   parameter type          axi_ext_mst_req_t = logic,
   parameter type          axi_ext_mst_rsp_t = logic,
   // Timing
-  parameter time          ClkPeriodSys      = 25ns,
+  parameter time          ClkPeriodSys      = 20ns,
   parameter time          ClkPeriodJtag     = 20ns,
   parameter time          ClkPeriodRtc      = 30518ns,
   parameter int unsigned  RstCycles         = 5,
@@ -41,6 +41,7 @@ module vip_cheshire_soc import cheshire_pkg::*; #(
   parameter int unsigned  AxiStrbBits       = $clog2(DutCfg.AxiDataWidth/8)
 ) (
   output logic       clk,
+  output logic       clk_40,
   output logic       rst_n,
   output logic       test_mode,
   output logic [1:0] boot_mode,
@@ -141,6 +142,14 @@ module vip_cheshire_soc import cheshire_pkg::*; #(
   ) i_clk_rst_sys (
     .clk_o  ( clk   ),
     .rst_no ( rst_n )
+  );
+
+  clk_rst_gen #(
+    .ClkPeriod    ( 25ns ), //40 MHz
+    .RstClkCycles ( RstCycles )
+  ) i_clk_40_rst_sys (
+    .clk_o  ( clk_40   ),
+    .rst_no ( )
   );
 
   clk_rst_gen #(
@@ -920,7 +929,8 @@ module vip_cheshire_soc import cheshire_pkg::*; #(
   ///////////////////////
   //VIDEO OUTPUT tester//
   ///////////////////////
-  localparam time pixel_period = 25ns;
+  //in picoseconds
+  localparam time pixel_period = 25000.0;
 
   //localparam tot_x = 1056, tot_y = 628;
   localparam act_x = 800, act_y = 600;
@@ -937,9 +947,9 @@ module vip_cheshire_soc import cheshire_pkg::*; #(
     //Wait for sync to be done
     #(pixel_period * hsync_time);
     #(1ps); //Wait one ps for sanity
-    $display("hsync time over, %t", $time);
+    $display("hsync time over after %t, %t", pixel_period * hsync_time, $time);
     assert (axi2hdmi_hsync_o == '0)
-    else   $error("Sync time is over, yet hsync still asserted");
+    else   $fatal("Sync time is over, yet hsync still asserted");
     //Wait for h backporch to be done
     #(pixel_period * h_backporch);
     $display("h_backporch over, %t", $time);

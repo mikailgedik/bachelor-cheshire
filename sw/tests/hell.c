@@ -293,11 +293,11 @@ int main(void) {
     volatile uint32_t * max_refill = reg32(AXI2HDMI_BASE, FIFI_MAX_REFILL_AMOUNT);
     *max_refill = 32;
     //Set clock divider to 2,3,ext clock, 5, 1
-    *clock_selector = 0x0002;
-    *clock_selector = 0x0003;
+    //*clock_selector = 0x0002;
+    //*clock_selector = 0x0003;
     *clock_selector = 0x0100; //Test external clock
-    *clock_selector = 0x0005;
-    *clock_selector = 0x0001;
+    //*clock_selector = 0x0005;
+    //*clock_selector = 0x0001;
 
     char str[] = "Hell!\r\n";
     uart_init(&__base_uart, reset_freq, __BOOT_BAUDRATE);

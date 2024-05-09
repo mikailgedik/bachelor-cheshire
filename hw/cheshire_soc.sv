@@ -24,6 +24,7 @@ module cheshire_soc import cheshire_pkg::*; #(
   parameter type reg_ext_rsp_t      = logic
 ) (
   input  logic        clk_i,
+  input  logic        clk_40_i,
   input  logic        rst_ni,
   input  logic        test_mode_i,
   input  logic [1:0]  boot_mode_i,
@@ -1711,9 +1712,8 @@ module cheshire_soc import cheshire_pkg::*; #(
     logic [23:0] axi2hdmi_colors;
     logic axi2hdmi_hsync, axi2hdmi_vsync;
 
-    //TODO attach the external pixel clk to somewhere
     logic axi2hdmi_external_pixel_clk;
-    assign axi2hdmi_external_pixel_clk = 'X;
+    assign axi2hdmi_external_pixel_clk = clk_40_i;
 
     logic axi2hdmi_divided_axi_c, axi2hdmi_pixel_c, axi2hdmi_pixel_rst_n;
 

@@ -110,6 +110,7 @@ module cheshire_top_xilinx (
 
   wire sys_clk;
   wire soc_clk;
+  wire soc_clk_40;
 
   IBUFDS #(
     .IBUF_LOW_PWR ("FALSE")
@@ -126,7 +127,8 @@ module cheshire_top_xilinx (
     .clk_100  ( ),
     .clk_50   ( soc_clk  ),
     .clk_20   ( ),
-    .clk_10   ( )
+    .clk_10   ( ),
+    .clk_40   ( soc_clk_40 )
   );
 
   /////////////////////
@@ -407,6 +409,7 @@ module cheshire_top_xilinx (
     .reg_ext_rsp_t      ( reg_req_t )
   ) i_cheshire_soc (
     .clk_i              ( soc_clk ),
+    .clk_40_i           ( soc_clk_40 ),
     .rst_ni             ( rst_n   ),
     .test_mode_i        ( test_mode_i ),
     .boot_mode_i        ( boot_mode   ),

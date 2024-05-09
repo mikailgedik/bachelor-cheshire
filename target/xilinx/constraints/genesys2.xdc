@@ -19,6 +19,17 @@ create_clock -period $SYS_TCK -name sys_clk [get_ports sys_clk_p]
 set SOC_TCK 20.0
 set soc_clk [get_clocks -of_objects [get_pins i_clkwiz/clk_50]]
 
+##################
+# AXI2HDMI clock #
+##################
+
+set AXI2HDMI_TCK 25.0
+set axi2hdmi_clk [get_clocks -of_objects [get_pins i_clkwiz/clk_40]]
+
+#we assume that soc_clk is faster than the axi2hdmi_clk 
+set_max_delay -datapath_only -from $axi2hdmi_clk -to $soc_clk [expr 0.67 * $SOC_TCK]
+set_max_delay -datapath_only -from $soc_clk -to $axi2hdmi_clk [expr 0.67 * $SOC_TCK]
+
 ############
 # Switches #
 ############

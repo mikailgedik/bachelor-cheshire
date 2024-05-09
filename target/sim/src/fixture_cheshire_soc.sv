@@ -25,6 +25,7 @@ module fixture_cheshire_soc #(
   ///////////
 
   logic       clk;
+  logic       clk_40;
   logic       rst_n;
   logic       test_mode;
   logic [1:0] boot_mode;
@@ -83,6 +84,7 @@ module fixture_cheshire_soc #(
     .reg_ext_rsp_t      ( reg_rsp_t )
   ) dut (
     .clk_i              ( clk       ),
+    .clk_40_i           ( clk_40    ),
     .rst_ni             ( rst_n     ),
     .test_mode_i        ( test_mode ),
     .boot_mode_i        ( boot_mode ),
