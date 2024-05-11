@@ -124,11 +124,10 @@ module cheshire_top_xilinx (
     .clk_in1  ( sys_clk ),
     .reset    ( '0 ),
     .locked   ( ),
-    .clk_100  ( ),
     .clk_50   ( soc_clk  ),
-    .clk_20   ( ),
-    .clk_10   ( ),
-    .clk_40   ( soc_clk_40 )
+    .clk_48   ( ),
+    .clk_40   ( soc_clk_40 ),
+    .clk_10   ( )
   );
 
   /////////////////////

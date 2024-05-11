@@ -295,16 +295,15 @@ int main(void) {
     //Set clock divider to 2,3,ext clock, 5, 1
     //*clock_selector = 0x0002;
     //*clock_selector = 0x0003;
-    *clock_selector = 0x0100; //Test external clock
+    *clock_selector = 0x0100; //Test external clock (40 MHz)
     //*clock_selector = 0x0005;
     //*clock_selector = 0x0001;
 
     char str[] = "Hell!\r\n";
     uart_init(&__base_uart, reset_freq, __BOOT_BAUDRATE);
-    /*
     uart_write_str(&__base_uart, str, sizeof(str));
     uart_write_flush(&__base_uart);
-    */
+    
     for(int i = 3; i < 16; i++)  {
         wts(i, -1);
     }
@@ -382,7 +381,7 @@ int main(void) {
         //*vga_disabler = (i / 0x00800) % 2;
     }
 
-    *reg32(AXI2HDMI_BASE, POWERREG) = 0;
+    //*reg32(AXI2HDMI_BASE, POWERREG) = 0;
     char b [] = "done\r\n";
     uart_write_str(&__base_uart, b, sizeof(b));
     uart_write_flush(&__base_uart);
