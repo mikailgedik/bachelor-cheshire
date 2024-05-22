@@ -142,6 +142,8 @@ module cheshire_reg_top #(
   logic hw_features_serial_link_re;
   logic hw_features_vga_qs;
   logic hw_features_vga_re;
+  logic hw_features_usb_qs;
+  logic hw_features_usb_re;
   logic hw_features_axirt_qs;
   logic hw_features_axirt_re;
   logic hw_features_clic_qs;
@@ -806,7 +808,22 @@ module cheshire_reg_top #(
   );
 
 
-  //   F[axirt]: 9:9
+  //   F[usb]: 9:9
+  prim_subreg_ext #(
+    .DW    (1)
+  ) u_hw_features_usb (
+    .re     (hw_features_usb_re),
+    .we     (1'b0),
+    .wd     ('0),
+    .d      (hw2reg.hw_features.usb.d),
+    .qre    (),
+    .qe     (),
+    .q      (),
+    .qs     (hw_features_usb_qs)
+  );
+
+
+  //   F[axirt]: 10:10
   prim_subreg_ext #(
     .DW    (1)
   ) u_hw_features_axirt (
@@ -821,7 +838,7 @@ module cheshire_reg_top #(
   );
 
 
-  //   F[clic]: 10:10
+  //   F[clic]: 11:11
   prim_subreg_ext #(
     .DW    (1)
   ) u_hw_features_clic (
@@ -836,7 +853,7 @@ module cheshire_reg_top #(
   );
 
 
-  //   F[irq_router]: 11:11
+  //   F[irq_router]: 12:12
   prim_subreg_ext #(
     .DW    (1)
   ) u_hw_features_irq_router (
@@ -851,7 +868,7 @@ module cheshire_reg_top #(
   );
 
 
-  //   F[bus_err]: 12:12
+  //   F[bus_err]: 13:13
   prim_subreg_ext #(
     .DW    (1)
   ) u_hw_features_bus_err (
@@ -866,7 +883,7 @@ module cheshire_reg_top #(
   );
 
 
-  //   F[paper_vga]: 13:13
+  //   F[paper_vga]: 14:14
   prim_subreg_ext #(
     .DW    (1)
   ) u_hw_features_paper_vga (
@@ -1163,6 +1180,8 @@ module cheshire_reg_top #(
 
   assign hw_features_vga_re = addr_hit[20] & reg_re & !reg_error;
 
+  assign hw_features_usb_re = addr_hit[20] & reg_re & !reg_error;
+
   assign hw_features_axirt_re = addr_hit[20] & reg_re & !reg_error;
 
   assign hw_features_clic_re = addr_hit[20] & reg_re & !reg_error;
@@ -1284,11 +1303,12 @@ module cheshire_reg_top #(
         reg_rdata_next[6] = hw_features_dma_qs;
         reg_rdata_next[7] = hw_features_serial_link_qs;
         reg_rdata_next[8] = hw_features_vga_qs;
-        reg_rdata_next[9] = hw_features_axirt_qs;
-        reg_rdata_next[10] = hw_features_clic_qs;
-        reg_rdata_next[11] = hw_features_irq_router_qs;
-        reg_rdata_next[12] = hw_features_bus_err_qs;
-        reg_rdata_next[13] = hw_features_paper_vga_qs;
+        reg_rdata_next[9] = hw_features_usb_qs;
+        reg_rdata_next[10] = hw_features_axirt_qs;
+        reg_rdata_next[11] = hw_features_clic_qs;
+        reg_rdata_next[12] = hw_features_irq_router_qs;
+        reg_rdata_next[13] = hw_features_bus_err_qs;
+        reg_rdata_next[14] = hw_features_paper_vga_qs;
       end
 
       addr_hit[21]: begin

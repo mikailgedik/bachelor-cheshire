@@ -14,7 +14,7 @@
 #include "util.h"
 #include "pepe.h"
 
-#define AXI2HDMI_BASE     ((void*)0x03009000)                           // Paper base address
+#define AXI2HDMI_BASE     ((void*)0x0300A000)                           // Paper base address
 #define CMD_IF_OFFSET     0x00000008                           // Paper's command interface's register size
 #define POINTERQ          ( 0 * CMD_IF_OFFSET)
 #define H_VTOT            ( 1 * CMD_IF_OFFSET)
@@ -64,7 +64,7 @@ void custom_sleep() {
 }
 
 void stress_ram() {
-    volatile uint64_t* ptr = arr;
+    volatile uint64_t* ptr = (volatile uint64_t*)arr;
     for(int i = 0; i < 0x1000000; i++) {
         *ptr;
         ptr++;
@@ -119,7 +119,7 @@ void write_params_to_screen(volatile uint16_t* dest);
 
 uint32_t test_peripheral(uint32_t* const err, uint32_t ptr) {
     //Select PAPER_hw
-    *reg32(&__base_regs, CHESHIRE_SCRATCH_0_REG_OFFSET + CHESHIRE_VGA_SELECT_REG_OFFSET) = 0x1;
+    *reg32(&__base_regs, CHESHIRE_VGA_SELECT_REG_OFFSET) = 0x1;
 
     uint32_t pixel_format;
     if(bytes_per_pixel == 1) {
@@ -134,31 +134,31 @@ uint32_t test_peripheral(uint32_t* const err, uint32_t ptr) {
     *reg32(AXI2HDMI_BASE, PIXEL_FORMAT) = pixel_format;
     *err = *reg32(AXI2HDMI_BASE, PIXEL_FORMAT);
     if(*err != pixel_format) {
-        return 1;
+        return PIXEL_FORMAT;
     }
 
     *reg32(AXI2HDMI_BASE, H_VTOT) = pixtot;
     *err = *reg32(AXI2HDMI_BASE, H_VTOT);
     if(*err != pixtot) {
-        return 1;
+        return H_VTOT;
     }
 
     *reg32(AXI2HDMI_BASE, H_VACTIVE) = pixact;
     *err = *reg32(AXI2HDMI_BASE, H_VACTIVE);
     if(*err != pixact) {
-        return 2;
+        return H_VACTIVE;
     }
 
     *reg32(AXI2HDMI_BASE, H_VFRONT) = front_porch;
     *err = *reg32(AXI2HDMI_BASE, H_VFRONT);
     if(*err != front_porch) {
-        return 4;
+        return H_VFRONT;
     }
 
     *reg32(AXI2HDMI_BASE, H_VSYNC) = sync_times;
     *err = *reg32(AXI2HDMI_BASE, H_VSYNC);
     if(*err != sync_times) {
-        return 5; 
+        return H_VSYNC; 
     }
     
     *reg32(AXI2HDMI_BASE, TEXT_BUFF_PARA) = (cols << 16) | rows;

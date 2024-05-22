@@ -31,6 +31,7 @@ package cheshire_pkg;
   localparam int unsigned SlinkNumLanes   = serial_link_single_channel_reg_pkg::NumBits/2;
   localparam int unsigned SlinkMaxClkDiv  = 1 << serial_link_single_channel_reg_pkg::Log2MaxClkDiv;
   localparam int unsigned ClintNumCores   = clint_reg_pkg::NumCores;
+  localparam int unsigned UsbNumPorts     = spinal_usb_ohci_pkg::NumPhyPorts;
 
   // Default JTAG ID code type
   typedef struct packed {
@@ -133,6 +134,7 @@ package cheshire_pkg;
     bit     SerialLink;
     bit     Vga;
     bit     Axi2Hdmi;
+    bit     Usb;
     bit     AxiRt;
     bit     Clic;
     bit     IrqRouter;
@@ -178,6 +180,10 @@ package cheshire_pkg;
     doub_bt SlinkTxAddrMask;
     doub_bt SlinkTxAddrDomain;
     dw_bt   SlinkUserAmoBit;
+    // Parameters for USB
+    dw_bt   UsbDmaMaxReads;
+    doub_bt UsbAddrMask;
+    doub_bt UsbAddrDomain;
     // Parameters for DMA
     dw_bt   DmaConfMaxReadTxns;
     dw_bt   DmaConfMaxWriteTxns;
@@ -218,6 +224,7 @@ package cheshire_pkg;
   typedef struct packed {
     cheshire_bus_err_intr_t bus_err;
     logic [31:0] gpio;
+    logic usb;
     logic spih_spi_event;
     logic spih_error;
     logic i2c_host_timeout;
@@ -277,7 +284,7 @@ package cheshire_pkg;
   localparam doub_bt AmRegs   = 'h0300_0000;
   localparam doub_bt AmLlc    = 'h0300_1000;
   localparam doub_bt AmSlink  = 'h0300_6000;
-  localparam doub_bt AmBusErr = 'h0300_8000;
+  localparam doub_bt AmBusErr = 'h0300_9000;
   localparam doub_bt AmSpm    = 'h1000_0000;  // Cached region at bottom, uncached on top
   localparam doub_bt AmClic   = 'h0800_0000;
 
@@ -298,6 +305,7 @@ package cheshire_pkg;
     aw_bt slink;
     aw_bt vga;
     aw_bt axi2hdmi;
+    aw_bt usb;
     aw_bt ext_base;
     aw_bt num_in;
   } axi_in_t;
@@ -311,6 +319,7 @@ package cheshire_pkg;
     if (cfg.SerialLink) begin i++; ret.slink = i; end
     if (cfg.Vga)        begin i++; ret.vga   = i; end
     if (cfg.Axi2Hdmi)   begin i++; ret.axi2hdmi = i; end
+    if (cfg.Usb)        begin i++; ret.usb   = i; end
     i++;
     ret.ext_base = i;
     ret.num_in = i + cfg.AxiExtNumMst;
@@ -393,6 +402,7 @@ package cheshire_pkg;
     aw_bt slink;
     aw_bt vga;
     aw_bt axi2hdmi;
+    aw_bt usb;
     aw_bt axirt;
     aw_bt irq_router;
     aw_bt [2**MaxCoresWidth-1:0] bus_err;
@@ -417,7 +427,8 @@ package cheshire_pkg;
     if (cfg.Gpio)         begin i++; ret.gpio       = i; r++; ret.map[r] = '{i, 'h0300_5000, 'h0300_6000}; end
     if (cfg.SerialLink)   begin i++; ret.slink      = i; r++; ret.map[r] = '{i, AmSlink, AmSlink +'h1000}; end
     if (cfg.Vga)          begin i++; ret.vga        = i; r++; ret.map[r] = '{i, 'h0300_7000, 'h0300_8000}; end
-    if (cfg.Axi2Hdmi)     begin i++; ret.axi2hdmi   = i; r++; ret.map[r] = '{i, 'h0300_9000, 'h0300_A000}; end
+    if (cfg.Usb)          begin i++; ret.usb        = i; r++; ret.map[r] = '{i, 'h0300_8000, 'h0300_9000}; end
+    if (cfg.Axi2Hdmi)     begin i++; ret.axi2hdmi   = i; r++; ret.map[r] = '{i, 'h0300_A000, 'h0300_B000}; end
     if (cfg.IrqRouter)    begin i++; ret.irq_router = i; r++; ret.map[r] = '{i, 'h0208_0000, 'h020c_0000}; end
     if (cfg.AxiRt)        begin i++; ret.axirt      = i; r++; ret.map[r] = '{i, 'h020c_0000, 'h0210_0000}; end
     if (cfg.Clic) for (int j = 0; j < cfg.NumCores; j++) begin
@@ -605,6 +616,7 @@ package cheshire_pkg;
     SerialLink        : 1,
     Vga               : 1,
     Axi2Hdmi          : 1,
+    Usb               : 1,
     AxiRt             : 0,
     Clic              : 0,
     IrqRouter         : 0,
@@ -651,6 +663,10 @@ package cheshire_pkg;
     SlinkTxAddrMask   : 'hFFFF_FFFF,
     SlinkTxAddrDomain : 'h0000_0000,
     SlinkUserAmoBit   : 1,  // Convention: lower AMO bits for cores, MSB for serial link
+    // USB config
+    UsbDmaMaxReads    : 16,
+    UsbAddrMask       : 'hFFFF_FFFF,
+    UsbAddrDomain     : 'h0000_0000,
     // DMA config
     DmaConfMaxReadTxns  : 4,
     DmaConfMaxWriteTxns : 4,

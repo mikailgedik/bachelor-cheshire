@@ -9,6 +9,7 @@
 /dts-v1/;
 
 / {
+
   #address-cells = <2>;
   #size-cells = <2>;
   compatible = "eth,cheshire-dev";
@@ -30,10 +31,12 @@
       status = "okay";
     };
   };
+
   memory@80000000 {
     device_type = "memory";
     reg = <0x0 0x80000000 0x0 0x40000000>;
   };
+
   cpus {
     #address-cells = <1>;
     #size-cells = <0>;
@@ -55,6 +58,7 @@
       };
     };
   };
+
   soc: soc {
     #address-cells = <2>;
     #size-cells = <2>;
@@ -104,9 +108,9 @@
       compatible = "eth,axi-vga";
       reg = <0x0 0x3007000 0x0 0x1000>;
     };
-    axi2hdmi: vga@3009000 {
+    axi2hdmi: vga@300A000 {
       compatible = "eth,axi-vga";
-      reg = <0x0 0x3009000 0x0 0x1000>;
+      reg = <0x0 0x300A000 0x0 0x1000>;
     };
     clint@2040000 {
       compatible = "riscv,clint0";
@@ -125,4 +129,5 @@
       reg = <0x0 0x4000000 0x0 0x4000000>;
     };
   };
+
 };

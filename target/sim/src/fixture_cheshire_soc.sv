@@ -149,7 +149,16 @@ module fixture_cheshire_soc #(
     .axi2hdmi_vsync_o   ( axi2hdmi_vsync_o ),
     .axi2hdmi_red_o     ( axi2hdmi_red_o ),
     .axi2hdmi_green_o   ( axi2hdmi_green_o ),
-    .axi2hdmi_blue_o    ( axi2hdmi_blue_o )
+    .axi2hdmi_blue_o    ( axi2hdmi_blue_o ),
+    
+    .usb_clk_i          ( 1'b0 ),
+    .usb_rst_ni         ( 1'b1 ),
+    .usb_dm_i           ( '0 ),
+    .usb_dm_o           ( ),
+    .usb_dm_oe_o        ( ),
+    .usb_dp_i           ( '0 ),
+    .usb_dp_o           ( ),
+    .usb_dp_oe_o        ( )
   );
 
   ////////////////////////
