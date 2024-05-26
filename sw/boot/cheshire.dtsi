@@ -19,17 +19,8 @@
     #address-cells = <2>;
     #size-cells = <2>;
     ranges;
-    bootargs = "console=ttyS0,115200 console=tty0";
+    bootargs = "console=tty0";
     stdout-path = "/soc/serial@3002000:115200";
-    framebuffer0: framebuffer@A0000000 {
-      compatible = "simple-framebuffer"; 
-      reg = <0x0 0xA0000000 0x0 (800 * 600 * 3)>;
-      width = <800>;
-      height = <600>;
-      stride = <(800 * 3)>;
-      format = "r8g8b8";
-      status = "okay";
-    };
   };
 
   memory@80000000 {
