@@ -55,7 +55,6 @@ uint32_t selected_offset = FIFO_REFILL_THRESHOLD;
 
 uint32_t bytes_per_pixel = 3;
 uint32_t is_in_text_mode = 1;
-const uint32_t make_animation = 0;
 const uint32_t is_interactive = 1;
 volatile uint8_t * const arr = (volatile uint8_t*)(void*)0x81000000;
 
@@ -75,19 +74,9 @@ const uint32_t sync_times = ((120<<16) + 6) | (1<<31) | (1<<15);
 
 const uint16_t cols = 96, rows = 36;
 
-void custom_sleep() {
-    asm volatile ("xor a1, a1, a1\n"
-        "addi a2, zero, 1\n"
-        "slli a2, a2, 22\n"
-        "label:\n"
-        "addi a1, a1, 1\n"
-        "bne a1, a2, label\n"
-    );
-}
-
-void stress_ram() {
+void stress_ram(uint16_t f) {
     volatile uint64_t* ptr = (volatile uint64_t*)arr;
-    for(int i = 0; i < 0x2000000; i++) {
+    for(uint64_t i = 0; i < 0x00010000 * f; i++) {
         *ptr;
         ptr++;
     }
@@ -199,7 +188,7 @@ uint32_t start_peripheral(uint32_t* const err, uint32_t ptr) {
     */
 
     //Values determined by trying
-    *reg32(AXI2HDMI_BASE, FIFO_REFILL_THRESHOLD) = 1;
+    *reg32(AXI2HDMI_BASE, FIFO_REFILL_THRESHOLD) = 16;
     *reg32(AXI2HDMI_BASE, FIFO_MAX_REFILL_AMOUNT) = 100;
 
     write_params_to_screen((uint16_t*)arr);
@@ -522,23 +511,44 @@ void write_params_to_screen(volatile uint16_t* const dest) {
     dest[(selected_offset / 8 + 1) * cols] = 0x5f00 | '>';
 }
 
-uint32_t asdfasdf = 0;
-uint32_t asdfasdf1 = 0;
+void sleep_intr(uint64_t ticks) {
+    //clint_sleep_ticks(0, ticks);
 
-void sleep_intr(uint64_t rtc_freq) {
-    //clint_sleep_ticks(0, ((uint64_t)1) << 63);
-
-    clint_set_mtimecmpx(0, clint_get_mtime() + rtc_freq);
+    
+    clint_set_mtimecmpx(0, clint_get_mtime() + ticks);
     fence();
     set_mtie(1);
     set_mie(1);
     
     wfi();
+    
 }
 
 void trap_vector(void) {
+    //Disaple interrupts in the IRQ; or else this will be re-enabled immediatly, causing a loop
     set_mtie(0);
     set_mie(0);
+}
+
+void automatic_tester(uint32_t rtc_freq) {
+    char num [] = "0000000000\r\n";
+
+    for(int thrs = 1; thrs < 32; thrs++) {
+        *reg32(AXI2HDMI_BASE, FIFO_REFILL_THRESHOLD) = thrs;
+        char s [] = "Threshold = ";
+        char s2[] = "; Time (ms) = ";
+        uart_write_str(&__base_uart, s, sizeof(s));
+        //skip newline
+        uart_write_str(&__base_uart, into_str(num, thrs), sizeof(num) - 3);
+
+        uint64_t time = clint_get_mtime();
+        stress_ram(0x80);
+        time = clint_get_mtime() - time;
+        uart_write_str(&__base_uart, s2, sizeof(s2));
+        uart_write_str(&__base_uart, into_str(num , time * 1000 / rtc_freq), sizeof(num));
+    }
+    
+    uart_write_flush(&__base_uart);
 }
 
 int main(void) {
@@ -561,18 +571,6 @@ int main(void) {
         return -1;
     }
     wts(5, *reg32(AXI2HDMI_BASE, CURRENT_PTR));
-
-    if(make_animation) {
-        if(is_in_text_mode == 0) {
-            for(int x = 0; x < 0x80; x++) {
-                //make_video(arr, x);
-            }
-        } else {
-            for(int x = 0; x < 0x10; x++) {
-                set_text((uint16_t*)arr, "Textii", x);
-            }
-        }
-    }
 
     if(is_interactive) {
         char str[] = "Hell!\r\n";
@@ -638,13 +636,7 @@ int main(void) {
                         //copy_pepe(arr);
                         break;
                     case 'S':
-                        char s [] = "Starting memory hitter...\r\n";
-                        uart_write_str(&__base_uart, s, sizeof(s));
-                        uart_write_flush(&__base_uart);
-                        stress_ram();
-                        char s2[] = "Done...\r\n";
-                        uart_write_str(&__base_uart, s2, sizeof(s2));
-                        uart_write_flush(&__base_uart);
+                        automatic_tester(rtc_freq);
                         break;
                     case 'O':
                         foreverypixel(arr, &colorcirc);
@@ -658,17 +650,11 @@ int main(void) {
                     default: break;
                 }
 
-                char * s3 = "Key Pressed: ";
-                uart_write_str(&__base_uart, s3, sizeof(s3));
-                uart_write_str(&__base_uart, into_str(num , c), sizeof(num));
-
                 write_params_to_screen((uint16_t*)arr);
 
             }
-            uint32_t time = clint_get_mtime();
-            uart_write_str(&__base_uart, into_str(num , time), sizeof(num));
-            //custom_sleep();
-            sleep_intr(rtc_freq);
+            
+            sleep_intr(rtc_freq / 10);
             if(cntr++ % 2 == 0) {
                 *ptr = c + (0xf000);
             } else {
