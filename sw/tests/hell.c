@@ -14,6 +14,10 @@
 #include "util.h"
 #include "pepe.h"
 
+#define abs(x) (x > 0 ? x : -x)
+#define max(x,y) (x > y ? x : y)
+#define min(x,y) (x < y ? x : y)
+
 #define AXI2HDMI_BASE     ((void*)0x0300A000)                           // Paper base address
 #define CMD_IF_OFFSET     0x00000008                           // Paper's command interface's register size
 #define POINTERQ          ( 0 * CMD_IF_OFFSET)
@@ -30,6 +34,22 @@
 #define PIXEL_FORMAT (11 * CMD_IF_OFFSET)
 #define FG_COLOR_PALETTE  0x400
 #define BG_COLOR_PALETTE  0x800
+
+typedef struct {
+    float r;       // a fraction between 0 and 1
+    float g;       // a fraction between 0 and 1
+    float b;       // a fraction between 0 and 1
+} rgb_t;
+
+typedef struct {
+    float h;       // angle in degrees
+    float s;       // a fraction between 0 and 1
+    float v;       // a fraction between 0 and 1
+} hsv_t;
+
+static rgb_t   hsv2rgb(hsv_t in);
+
+uint32_t selected_offset = FIFO_REFILL_THRESHOLD;
 
 uint32_t bytes_per_pixel = 3;
 uint32_t is_in_text_mode = 1;
@@ -51,7 +71,7 @@ const uint32_t front_porch = (56<<16) + 37;
 const uint32_t sync_times = ((120<<16) + 6) | (1<<31) | (1<<15);
 */
 
-const uint16_t cols = 96, rows = 35;
+const uint16_t cols = 96, rows = 36;
 
 void custom_sleep() {
     asm volatile ("xor a1, a1, a1\n"
@@ -65,7 +85,7 @@ void custom_sleep() {
 
 void stress_ram() {
     volatile uint64_t* ptr = (volatile uint64_t*)arr;
-    for(int i = 0; i < 0x1000000; i++) {
+    for(int i = 0; i < 0x2000000; i++) {
         *ptr;
         ptr++;
     }
@@ -95,29 +115,13 @@ void rgb888_to_rgb332(const uint8_t * const src, volatile uint8_t * const dest) 
             ((src[0] >> 6)& 0b11);
 }
 
-/*
-void rgb565_to_rgb888(const uint8_t* const src, volatile uint8_t * const dest) {
-  dest[0] = 0;
-  dest[1] = 0;
-  dest[2] = 0;
-
-  dest[2] = src[1] & 0xF8;
-  dest[1] = ((src[1] & 0x7) << 5) | ((src[0] >> 3) & 0b11100) ;
-  dest[0] = src[0] << 3;
-
-  dest[2] &= 0xff;
-  dest[1] &= 0xff;
-  dest[0] &= 0xff;
-}
-*/
-
 void wts(int idx, uint32_t val) {
     *reg32(&__base_regs, CHESHIRE_SCRATCH_0_REG_OFFSET + CHESHIRE_SCRATCH_1_REG_OFFSET * idx) = val;
 }
 
 void write_params_to_screen(volatile uint16_t* dest);
 
-uint32_t test_peripheral(uint32_t* const err, uint32_t ptr) {
+uint32_t start_peripheral(uint32_t* const err, uint32_t ptr) {
     //Select PAPER_hw
     *reg32(&__base_regs, CHESHIRE_VGA_SELECT_REG_OFFSET) = 0x1;
 
@@ -136,6 +140,12 @@ uint32_t test_peripheral(uint32_t* const err, uint32_t ptr) {
     if(*err != pixel_format) {
         return PIXEL_FORMAT;
     }
+
+    //Set clock to external clock
+    // = 0x0001 would tie it to internal clock with divider 1
+    // = 0x0001 would tie it to internal clock with divider 2
+    // etc.
+    *reg32(&__base_regs, CHESHIRE_AXI2HDMI_CLOCK_CONFIG_REG_OFFSET) = 0x0100;
 
     *reg32(AXI2HDMI_BASE, H_VTOT) = pixtot;
     *err = *reg32(AXI2HDMI_BASE, H_VTOT);
@@ -187,7 +197,7 @@ uint32_t test_peripheral(uint32_t* const err, uint32_t ptr) {
     */
 
     //Values determined by trying
-    *reg32(AXI2HDMI_BASE, FIFO_REFILL_THRESHOLD) = 25;
+    *reg32(AXI2HDMI_BASE, FIFO_REFILL_THRESHOLD) = 1;
     *reg32(AXI2HDMI_BASE, FIFO_MAX_REFILL_AMOUNT) = 100;
 
     write_params_to_screen((uint16_t*)arr);
@@ -201,6 +211,184 @@ uint32_t test_peripheral(uint32_t* const err, uint32_t ptr) {
     *err = 0;
     return 0;
 }
+
+rgb_t hsv2rgb(hsv_t in) {
+    float      hh, p, q, t, ff;
+    long        i;
+    rgb_t         out;
+
+    if(in.s <= 0.0) {       // < is bogus, just shuts up warnings
+        out.r = in.v;
+        out.g = in.v;
+        out.b = in.v;
+        return out;
+    }
+    hh = in.h;
+    if(hh >= 360.0) hh = 0.0;
+    hh /= 60.0;
+    i = (long)hh;
+    ff = hh - i;
+    p = in.v * (1.0 - in.s);
+    q = in.v * (1.0 - (in.s * ff));
+    t = in.v * (1.0 - (in.s * (1.0 - ff)));
+
+    switch(i) {
+    case 0:
+        out.r = in.v;
+        out.g = t;
+        out.b = p;
+        break;
+    case 1:
+        out.r = q;
+        out.g = in.v;
+        out.b = p;
+        break;
+    case 2:
+        out.r = p;
+        out.g = in.v;
+        out.b = t;
+        break;
+
+    case 3:
+        out.r = p;
+        out.g = q;
+        out.b = in.v;
+        break;
+    case 4:
+        out.r = t;
+        out.g = p;
+        out.b = in.v;
+        break;
+    case 5:
+    default:
+        out.r = in.v;
+        out.g = p;
+        out.b = q;
+        break;
+    }
+    return out;     
+}
+
+float sqrt2(float x) {
+    //taylor of sqrt(x+1/2)
+    float one_divided_bz_sqrt_of_2 = 0.70710678118;
+    x -= 0.5;
+
+    float r = 1;
+    r += x;
+    r -= x * x / 2;
+    r += x * x * x / 2;
+    r -= x * x * x * x * 5 / 8;
+    
+    return r * one_divided_bz_sqrt_of_2;
+}
+
+
+float arctan2(float x, float y) {
+    float a = min (abs(x), abs(y)) / max ((x), (y));
+    float s = a * a;
+    float r = ((-0.0464964749 * s + 0.15931422) * s - 0.327622764) * s * a + a;
+    if (abs(y) > abs(x)) {
+        r = 1.57079637 - r;
+    }
+    if (x < 0) r = 3.14159274 - r;
+    if (y < 0) r = -r;
+    if(r < 0) {
+        r += 2* 3.14159274;
+    }
+    return r;
+}
+
+uint32_t colorcirc(int xp, int yp) {
+    float x = xp, y = yp;
+    float norm = 280 * 280;
+    float dx = x - 400;
+    float dy = y - 300;
+    float r = dy * dy + dx * dx;
+    r /= norm;
+
+    rgb_t col;
+    if(r >= 1) {
+        col.r = 0;
+        col.g = 0;
+        col.b = 0;
+    } else {
+        r = sqrt2(r);
+        hsv_t col_in;
+        col_in.v = 1;
+        col_in.s = r;
+
+        if(dx == 0) {
+            if(dy < 0)
+                col_in.h = 180;
+            else
+                col_in.h = 0;
+        } else if(dy == 0) {
+            if(dx > 0)
+                col_in.h = 270;
+            else
+                col_in.h = 90;
+        } else {
+            col_in.h = arctan2(dx, dy) * 360 / (3.14159274 * 2);
+        }
+        col = hsv2rgb(col_in);
+    }
+    col.r = max(0, min(255, col.r * 255));
+    col.g = max(0, min(255, col.g * 255));
+    col.b = max(0, min(255, col.b * 255));
+
+    return (((uint8_t)col.r) << 16) | (((uint8_t)col.g) << 8) | (((uint8_t)col.b) << 0);
+    
+}
+
+void foreverypixel(volatile uint8_t * target, uint32_t (*fun)(int, int)) {
+    uint32_t rgb1;
+    uint8_t * rgb = (uint8_t*) &rgb1;
+    for(int y = 0; y < 600; y++)
+        for(int x = 0; x < 800; x++) {
+            rgb1 = fun(x, y);
+            if(bytes_per_pixel == 3) {
+                target[2] = rgb[2];
+                target[1] = rgb[1];
+                target[0] = rgb[0];
+            } else if(bytes_per_pixel == 2) {
+                rgb888_to_rgb565(rgb, target);
+            } else {
+
+                rgb888_to_rgb332(rgb, target);
+            }
+            target += bytes_per_pixel;
+        }
+    fence();
+}
+
+void show_colors(volatile uint8_t * target) {
+    uint8_t rgb[] = {0,0,0};
+    for(int y = 0; y < 600; y++)
+        for(int x = 0; x < 800; x++) {
+            rgb[2] = rgb[1] = rgb[0] = 0;
+            if(y < 200) {
+                rgb[2] = 255 * x / 800;
+            } else if(y < 400) {
+                rgb[1] = 255 * x / 800;
+            } else {
+                rgb[0] = 255 * x / 800;
+            }
+            if(bytes_per_pixel == 3) {
+                target[2] = rgb[2];
+                target[1] = rgb[1];
+                target[0] = rgb[0];
+            } else if(bytes_per_pixel == 2) {
+                rgb888_to_rgb565(rgb, target);
+            } else {
+
+                rgb888_to_rgb332(rgb, target);
+            }
+            target += bytes_per_pixel;
+    }
+    fence();
+}
+
 
 void copy_pepe(volatile uint8_t * const target) {
     volatile uint8_t * dst = target;
@@ -240,7 +428,7 @@ void init_memory(volatile uint8_t * const target) {
     } else {
         volatile uint8_t * dst = target;
         uint32_t rgb;
-        uint8_t * src = &rgb;
+        uint8_t * src = (uint8_t*)&rgb;
         if(bytes_per_pixel == 1) {
             for(int i = 0; i < 800 * 600; i++) {
                 rgb = i;
@@ -267,10 +455,6 @@ void init_memory(volatile uint8_t * const target) {
 
     //Make sure that RAM is updated
     fence();
-}
-
-float sin(float x) {
-    return x - x*x*x / 6 + x*x*x*x*x / 120;
 }
 
 void set_text(volatile uint16_t * target, char * text, int row) {
@@ -314,7 +498,7 @@ char* into_str16(char* d, uint32_t s) {
     return d;
 }
 
-void write_params_to_screen(volatile uint16_t* dest) {
+void write_params_to_screen(volatile uint16_t* const dest) {
     char buff[]   = "0000000000";
     char buff16[] = "00112233";
     int i = 1;
@@ -332,38 +516,25 @@ void write_params_to_screen(volatile uint16_t* dest) {
 
     set_text(dest, "mlen: ", i);set_text(dest + 10, into_str(buff, *reg32(AXI2HDMI_BASE, FIFO_MAX_REFILL_AMOUNT)), i++);
     set_text(dest, "pfor: ", i);set_text(dest + 10, into_str16(buff16, *reg32(AXI2HDMI_BASE, PIXEL_FORMAT)), i++);
+
+    dest[(selected_offset / 8 + 1) * cols] = 0x5f00 | '>';
+
+//    set_text(dest, ">", selected_offset / 8 + 1);
 }
 
 int main(void) {
     uint32_t rtc_freq = *reg32(&__base_regs, CHESHIRE_RTC_FREQ_REG_OFFSET);
     uint64_t reset_freq = clint_get_core_freq(rtc_freq, 2500);
 
-    volatile uint32_t * clock_selector = reg32(&__base_regs, CHESHIRE_AXI2HDMI_CLOCK_CONFIG_REG_OFFSET);
-    volatile uint32_t * refill_thrsh = reg32(AXI2HDMI_BASE, FIFO_REFILL_THRESHOLD);
-    volatile uint32_t * max_refill = reg32(AXI2HDMI_BASE, FIFO_MAX_REFILL_AMOUNT);
-    *max_refill = 32;
-    //Set clock divider to 2,3,ext clock, 5, 1
-    //*clock_selector = 0x0002;
-    //*clock_selector = 0x0003;
-    *clock_selector = 0x0100; //Test external clock (40 MHz)
-    //*clock_selector = 0x0005;
-    //*clock_selector = 0x0001;
-    
-    char str[] = "Hell!\r\n";
     uart_init(&__base_uart, reset_freq, __BOOT_BAUDRATE);
 
-    /*
-    uart_write_str(&__base_uart, str, sizeof(str));
-    uart_write_flush(&__base_uart);
-    */
     for(int i = 3; i < 16; i++)  {
         wts(i, -1);
     }
     init_memory(arr);
-    //copy_pepe(arr);
     
     uint32_t err;
-    uint32_t ret = test_peripheral(&err, (uint32_t)(uint64_t)arr);
+    uint32_t ret = start_peripheral(&err, (uint32_t)(uint64_t)arr);
      
     wts(3, ret);
     wts(4, err);
@@ -385,64 +556,93 @@ int main(void) {
     }
 
     if(is_interactive) {
+        char str[] = "Hell!\r\n";
         uart_write_str(&__base_uart, str, sizeof(str));
         uart_write_flush(&__base_uart);
         
         volatile uint16_t * ptr = (volatile uint16_t *)arr;
         char c = '9';
         uint32_t cntr = 0;
+        char num [] = "0000000000\r\n";
         while(c != 'q') {
             if(uart_read_ready(&__base_uart)) {
-                char num [] = "0000000000\r\n";
                 c = uart_read(&__base_uart);
-                if(c >= '0' && c <= '9') {
-                    *max_refill = 1 + (c - '0') * 2;
-                } else if(c >= 'a' && c <= 'z') {
-                    *refill_thrsh = 1 + (c - 'a') * 4;
-                } else if(c == 'T') {
-                    //Stop hold mode
-                    is_in_text_mode = !is_in_text_mode;
+                uint32_t val;
 
-                    *reg32(AXI2HDMI_BASE, POWERREG) = (1 | (is_in_text_mode << 16));
-                    *reg32(AXI2HDMI_BASE, POINTERQ) = ((uint32_t)(uint64_t)arr) | 0b110;
-                } else if (c == 'M') {
-                    init_memory(arr);
-                } else if (c == 'L') {
-                    //Bytes per pixel is 1, 2 or 3
-                    bytes_per_pixel %= 3;
-                    bytes_per_pixel++;
-                    uint32_t pixel_format;
-                    if(bytes_per_pixel == 1) {
-                        pixel_format = 0x02030301;
-                    } else if (bytes_per_pixel == 2) {
-                        pixel_format = 0x05060502;
-                    } else {
-                        //3 bytes per pixel
-                        pixel_format = 0x08080803;
-                    }
-                    *reg32(AXI2HDMI_BASE, PIXEL_FORMAT) = pixel_format;
-                } else if (c == 'P') {
-                    //Bytes per pixel is 1, 2 or 3
-                    //copy_pepe(arr);
-                } else if (c == 'S') {
-                    char s [] = "Starting memory hitter...\r\n";
-                    uart_write_str(&__base_uart, s, sizeof(s));
-                    uart_write_flush(&__base_uart);
-                    stress_ram();
-                    char s2[] = "Done...\r\n";
-                    uart_write_str(&__base_uart, s2, sizeof(s2));
-                    uart_write_flush(&__base_uart);
+                switch(c) {
+                    case 'a':
+                        val = *reg32(AXI2HDMI_BASE, selected_offset);
+                        val -= 1;
+                        *reg32(AXI2HDMI_BASE, selected_offset) = val;
+                        break;
+                    case 'd':
+                        val = *reg32(AXI2HDMI_BASE, selected_offset);
+                        val += 1;
+                        *reg32(AXI2HDMI_BASE, selected_offset) = val;
+                        break;
+                    case 'w':
+                        if(selected_offset > 7) {
+                            selected_offset -= 8;
+                        }
+                        break;
+                    case 's':
+                        selected_offset += 8;
+                        selected_offset %= 0x60;
+                        break;
+                    case 'T':
+                        //Stop hold mode
+                        is_in_text_mode = !is_in_text_mode;
+
+                        *reg32(AXI2HDMI_BASE, POWERREG) = (1 | (is_in_text_mode << 16));
+                        *reg32(AXI2HDMI_BASE, POINTERQ) = ((uint32_t)(uint64_t)arr) | 0b110;
+                        break;
+                    case 'M':
+                        init_memory(arr);
+                        break;
+                    case 'L':
+                        //Bytes per pixel is 1, 2 or 3
+                        bytes_per_pixel %= 3;
+                        bytes_per_pixel++;
+                        uint32_t pixel_format;
+                        if(bytes_per_pixel == 1) {
+                            pixel_format = 0x02030301;
+                        } else if (bytes_per_pixel == 2) {
+                            pixel_format = 0x05060502;
+                        } else {
+                            //3 bytes per pixel
+                            pixel_format = 0x08080803;
+                        }
+                        *reg32(AXI2HDMI_BASE, PIXEL_FORMAT) = pixel_format;
+                        break;
+                    case 'P':
+                        //Bytes per pixel is 1, 2 or 3
+                        //copy_pepe(arr);
+                        break;
+                    case 'S':
+                        char s [] = "Starting memory hitter...\r\n";
+                        uart_write_str(&__base_uart, s, sizeof(s));
+                        uart_write_flush(&__base_uart);
+                        stress_ram();
+                        char s2[] = "Done...\r\n";
+                        uart_write_str(&__base_uart, s2, sizeof(s2));
+                        uart_write_flush(&__base_uart);
+                        break;
+                    case 'O':
+                        foreverypixel(arr, &colorcirc);
+                        break;
+                    case 'U':
+                        show_colors(arr);
+                        break;
+                    case 'F':
+                        uart_write_str(&__base_uart, into_str(num , arctan2(50, 70) * 1000), sizeof(num));
+                        break;
+                    default: break;
                 }
 
-                char s1 [] = "Max refill: \r\n";
-                char s2 [] = "Thresh: \r\n";
-                uart_write_str(&__base_uart, s1, sizeof(s1));
-                uart_write_str(&__base_uart, into_str(num , *max_refill), sizeof(num));
-                uart_write_str(&__base_uart, s2, sizeof(s2));
-                uart_write_str(&__base_uart, into_str(num , *refill_thrsh), sizeof(num));
-                uart_write_flush(&__base_uart);
+                char * s3 = "Key Pressed: ";
+                uart_write_str(&__base_uart, s3, sizeof(s3));
+                uart_write_str(&__base_uart, into_str(num , c), sizeof(num));
 
-                into_str(num , *reg32(AXI2HDMI_BASE, POINTERQ));
                 write_params_to_screen((uint16_t*)arr);
             }
 
