@@ -9,6 +9,7 @@
 
 #include "regs/cheshire.h"
 #include "dif/clint.h"
+#include "regs/clint.h"
 #include "dif/uart.h"
 #include "params.h"
 #include "util.h"
@@ -18,6 +19,7 @@
 #define max(x,y) (x > y ? x : y)
 #define min(x,y) (x < y ? x : y)
 
+//clint needed for the RTC
 #define AXI2HDMI_BASE     ((void*)0x0300A000)                           // Paper base address
 #define CMD_IF_OFFSET     0x00000008                           // Paper's command interface's register size
 #define POINTERQ          ( 0 * CMD_IF_OFFSET)
@@ -518,8 +520,25 @@ void write_params_to_screen(volatile uint16_t* const dest) {
     set_text(dest, "pfor: ", i);set_text(dest + 10, into_str16(buff16, *reg32(AXI2HDMI_BASE, PIXEL_FORMAT)), i++);
 
     dest[(selected_offset / 8 + 1) * cols] = 0x5f00 | '>';
+}
 
-//    set_text(dest, ">", selected_offset / 8 + 1);
+uint32_t asdfasdf = 0;
+uint32_t asdfasdf1 = 0;
+
+void sleep_intr(uint64_t rtc_freq) {
+    //clint_sleep_ticks(0, ((uint64_t)1) << 63);
+
+    clint_set_mtimecmpx(0, clint_get_mtime() + rtc_freq);
+    fence();
+    set_mtie(1);
+    set_mie(1);
+    
+    wfi();
+}
+
+void trap_vector(void) {
+    set_mtie(0);
+    set_mie(0);
 }
 
 int main(void) {
@@ -644,9 +663,12 @@ int main(void) {
                 uart_write_str(&__base_uart, into_str(num , c), sizeof(num));
 
                 write_params_to_screen((uint16_t*)arr);
-            }
 
-            custom_sleep();
+            }
+            uint32_t time = clint_get_mtime();
+            uart_write_str(&__base_uart, into_str(num , time), sizeof(num));
+            //custom_sleep();
+            sleep_intr(rtc_freq);
             if(cntr++ % 2 == 0) {
                 *ptr = c + (0xf000);
             } else {
