@@ -650,7 +650,7 @@ package cheshire_pkg;
     VgaMaxReadTxns    : 24,
 
     //Axi2Hdmi
-    Axi2HdmiScFifoDepth  : 32,
+    Axi2HdmiScFifoDepth  : 64,
     Axi2HdmiDcFifoDepth  : 8,
     Axi2HdmiCut          : 1,
 

@@ -929,17 +929,18 @@ module vip_cheshire_soc import cheshire_pkg::*; #(
   ///////////////////////
   //VIDEO OUTPUT tester//
   ///////////////////////
-  //in picoseconds
-  localparam time pixel_period = 25000.0;
 
-  //localparam tot_x = 1056, tot_y = 628;
-  localparam act_x = 800, act_y = 600;
+  // Currently set to 640x480@60 with pixel clk of 25 MHz
+  //in picoseconds
+  localparam time pixel_period = 40000.0;
+
+  localparam act_x = 640, act_y = 480;
   //In lines
-  localparam vsync_time = 4;
-  localparam v_backporch = 23;
+  localparam vsync_time = 2;
+  localparam v_backporch = 33;
   //In pixels
-  localparam hsync_time = 128;
-  localparam h_backporch = 88;
+  localparam hsync_time = 96;
+  localparam h_backporch = 48;
 
   //This function should be called when axi2hdmi_hsync_o has already be asserted
   task automatic get_line(output int line [act_x]);

@@ -21,6 +21,15 @@
     ranges;
     bootargs = "console=tty0";
     stdout-path = "/soc/serial@3002000:115200";
+    framebuffer0: framebuffer@A0000000 {
+      compatible = "simple-framebuffer"; 
+      reg = <0x0 0xA0000000 0x0 (640 * 480 * 1)>;
+      width = <640>;
+      height = <480>;
+      stride = <(640 * 1)>;
+      format = "r3g3b2";
+      status = "okay";
+    };
   };
 
   memory@80000000 {
