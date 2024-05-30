@@ -8,6 +8,7 @@
 // Simple payload to test bootmodes
 
 #include "axi2hdmi_util/axi2hdmi.c"
+#include "axi2hdmi_util/automatic_tester.c"
 
 void interactive(uint32_t rtc_freq) {
     char str[] = "Hell!\r\n";
@@ -41,7 +42,7 @@ void interactive(uint32_t rtc_freq) {
                     break;
                 case 's':
                     selected_offset += 8;
-                    selected_offset %= 0x60;
+                    selected_offset %= 0x68;
                     break;
                 case 'T':
                     //Stop hold mode

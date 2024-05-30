@@ -55,8 +55,8 @@ static rgb_t   hsv2rgb(hsv_t in);
 uint32_t selected_offset = FIFO_REFILL_THRESHOLD;
 
 uint32_t bytes_per_pixel = 3;
-uint32_t is_in_text_mode = 0;
-const uint32_t is_interactive = 0;
+uint32_t is_in_text_mode = 1;
+const uint32_t is_interactive = 1;
 volatile uint8_t * const arr = (volatile uint8_t*)(void*)0x81000000;
 
 /*
@@ -73,6 +73,7 @@ const uint32_t pixact = (800<<16) + 600;
 const uint32_t front_porch = (56<<16) + 37;
 const uint32_t sync_times = ((120<<16) + 6) | (1<<31) | (1<<15);
 */
+
 //For 25 MHz
 const uint32_t pixtot = (800<<16) + 525;
 const uint32_t pixact = (640<<16) + 480;
@@ -80,7 +81,7 @@ const uint32_t front_porch = (16<<16) + 10;
 const uint32_t sync_times = ((96<<16) + 2) | (1<<31) | (1<<15);
 
 
-const uint16_t cols = 96, rows = 36;
+const uint16_t cols = 80, rows = 30;
 
 void stress_ram(uint16_t f) {
     volatile uint64_t* ptr = (volatile uint64_t*)arr;
@@ -197,10 +198,10 @@ uint32_t start_peripheral(uint32_t* const err, uint32_t ptr) {
     */
 
     //Values determined by trying
-    *reg32(AXI2HDMI_BASE, FIFO_REFILL_THRESHOLD) = 4;
-    *reg32(AXI2HDMI_BASE, FIFO_MAX_REFILL_AMOUNT) = 4;
+    *reg32(AXI2HDMI_BASE, FIFO_REFILL_THRESHOLD) = 16;
+    *reg32(AXI2HDMI_BASE, FIFO_MAX_REFILL_AMOUNT) = 16;
 
-    //write_params_to_screen((uint16_t*)arr);
+    write_params_to_screen((uint16_t*)arr);
 
     *reg32(AXI2HDMI_BASE, POWERREG) = (1 | (is_in_text_mode << 16));
     *err = *reg32(AXI2HDMI_BASE, POWERREG);
@@ -497,6 +498,17 @@ char* into_str16(char* d, uint32_t s) {
     return d;
 }
 
+/*
+char* into_str(uint32_t s) {
+    static char[] d = "0000000000";
+    return into_str_safe(d, s);
+}
+
+char* into_str16(uint32_t s) {
+    static char buff16[] = "00112233";
+    return into_str16_safe(d, s);
+}
+*/
 void write_params_to_screen(volatile uint16_t* const dest) {
     char buff[]   = "0000000000";
     char buff16[] = "00112233";
@@ -515,6 +527,8 @@ void write_params_to_screen(volatile uint16_t* const dest) {
 
     set_text(dest, "mlen: ", i);set_text(dest + 10, into_str(buff, *reg32(AXI2HDMI_BASE, FIFO_MAX_REFILL_AMOUNT)), i++);
     set_text(dest, "pfor: ", i);set_text(dest + 10, into_str16(buff16, *reg32(AXI2HDMI_BASE, PIXEL_FORMAT)), i++);
+
+    set_text(dest, "serr: ", i);set_text(dest + 10, into_str16(buff16, *reg32(AXI2HDMI_BASE, SYNC_FAIL_HAPPENED)), i++);
 
     dest[(selected_offset / 8 + 1) * cols] = 0x5f00 | '>';
 }
@@ -537,23 +551,10 @@ void trap_vector(void) {
     set_mie(0);
 }
 
-void automatic_tester(uint32_t rtc_freq) {
-    char num [] = "0000000000\r\n";
-
-    for(int thrs = 1; thrs < 32; thrs++) {
-        *reg32(AXI2HDMI_BASE, FIFO_REFILL_THRESHOLD) = thrs;
-        char s [] = "Threshold = ";
-        char s2[] = "; Time (ms) = ";
-        uart_write_str(&__base_uart, s, sizeof(s));
-        //skip newline
-        uart_write_str(&__base_uart, into_str(num, thrs), sizeof(num) - 3);
-
-        uint64_t time = clint_get_mtime();
-        stress_ram(0x80);
-        time = clint_get_mtime() - time;
-        uart_write_str(&__base_uart, s2, sizeof(s2));
-        uart_write_str(&__base_uart, into_str(num , time * 1000 / rtc_freq), sizeof(num));
-    }
-    
+void printstr(char const * const str) {
+    int len = 0;
+    char const * tmp = str;
+    while(*tmp != 0) tmp++;
+    uart_write_str(&__base_uart, str, tmp-str);
     uart_write_flush(&__base_uart);
 }
