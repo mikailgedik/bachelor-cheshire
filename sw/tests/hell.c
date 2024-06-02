@@ -11,14 +11,11 @@
 #include "axi2hdmi_util/automatic_tester.c"
 
 void interactive(uint32_t rtc_freq) {
-    char str[] = "Hell!\r\n";
-    uart_write_str(&__base_uart, str, sizeof(str));
-    uart_write_flush(&__base_uart);
-    
+    printstr("Hell!\r\n");
+
     volatile uint16_t * ptr = (volatile uint16_t *)arr;
     char c = '9';
     uint32_t cntr = 0;
-    char num [] = "0000000000\r\n";
     while(c != 'q') {
         if(uart_read_ready(&__base_uart)) {
             c = uart_read(&__base_uart);
@@ -51,7 +48,7 @@ void interactive(uint32_t rtc_freq) {
                     *reg32(AXI2HDMI_BASE, POWERREG) = (1 | (is_in_text_mode << 16));
                     *reg32(AXI2HDMI_BASE, POINTERQ) = ((uint32_t)(uint64_t)arr) | 0b110;
                     break;
-                case 'M':
+                case 'M': 
                     init_memory(arr);
                     break;
                 case 'L':
@@ -83,13 +80,12 @@ void interactive(uint32_t rtc_freq) {
                     show_colors(arr);
                     break;
                 case 'F':
-                    uart_write_str(&__base_uart, into_str(num , arctan2(50, 70) * 1000), sizeof(num));
+                    printstr(into_str(arctan2(50, 70) * 1000));
                     break;
                 default: break;
             }
 
             write_params_to_screen((uint16_t*)arr);
-
         }
         
         sleep_intr(rtc_freq / 10);
@@ -103,7 +99,7 @@ void interactive(uint32_t rtc_freq) {
     }
 }
 
-void simulation(volatile uint8_t* arr, uint32_t rtc_freq) {
+void simulation(uint32_t rtc_freq) {
     //One frame takes ~16.66ms
     uint32_t millis_per_frame = 17;
     sleep_intr(rtc_freq * (millis_per_frame / 2) / 1000);
@@ -118,7 +114,6 @@ void simulation(volatile uint8_t* arr, uint32_t rtc_freq) {
 int main(void) {
     uint32_t rtc_freq = *reg32(&__base_regs, CHESHIRE_RTC_FREQ_REG_OFFSET);
     uint64_t reset_freq = clint_get_core_freq(rtc_freq, 2500);
-
     uart_init(&__base_uart, reset_freq, __BOOT_BAUDRATE);
 
     for(int i = 3; i < 16; i++)  {
@@ -147,11 +142,10 @@ int main(void) {
         init_memory(arr);
         interactive(rtc_freq);
     } else {
-        simulation(arr, rtc_freq);
+        simulation(rtc_freq);
     }
-
-    char b [] = "done\r\n";
-    uart_write_str(&__base_uart, b, sizeof(b));
-    uart_write_flush(&__base_uart);
+    
+    printstr("done\r\n");
     return 0;
+    
 }

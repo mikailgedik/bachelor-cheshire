@@ -59,6 +59,9 @@ uint32_t is_in_text_mode = 1;
 const uint32_t is_interactive = 1;
 volatile uint8_t * const arr = (volatile uint8_t*)(void*)0x81000000;
 
+#define WIDTH 640
+#define HEIGHT 480
+
 /*
 //For 40 MHz
 const uint32_t pixtot = (1056<<16) + 628;
@@ -301,9 +304,9 @@ float arctan2(float x, float y) {
 
 uint32_t colorcirc(int xp, int yp) {
     float x = xp, y = yp;
-    float norm = 280 * 280;
-    float dx = x - 400;
-    float dy = y - 300;
+    float norm = (HEIGHT / 2) * (HEIGHT / 2) / 2;
+    float dx = x - WIDTH / 2;
+    float dy = y - HEIGHT / 2;
     float r = dy * dy + dx * dx;
     r /= norm;
 
@@ -344,8 +347,8 @@ uint32_t colorcirc(int xp, int yp) {
 void foreverypixel(volatile uint8_t * target, uint32_t (*fun)(int, int)) {
     uint32_t rgb1;
     uint8_t * rgb = (uint8_t*) &rgb1;
-    for(int y = 0; y < 600; y++)
-        for(int x = 0; x < 800; x++) {
+    for(int y = 0; y < HEIGHT; y++)
+        for(int x = 0; x < WIDTH; x++) {
             rgb1 = fun(x, y);
             if(bytes_per_pixel == 3) {
                 target[2] = rgb[2];
@@ -364,15 +367,15 @@ void foreverypixel(volatile uint8_t * target, uint32_t (*fun)(int, int)) {
 
 void show_colors(volatile uint8_t * target) {
     uint8_t rgb[] = {0,0,0};
-    for(int y = 0; y < 600; y++)
-        for(int x = 0; x < 800; x++) {
+    for(int y = 0; y < HEIGHT; y++)
+        for(int x = 0; x < WIDTH; x++) {
             rgb[2] = rgb[1] = rgb[0] = 0;
-            if(y < 200) {
-                rgb[2] = 255 * x / 800;
-            } else if(y < 400) {
-                rgb[1] = 255 * x / 800;
+            if(y < HEIGHT / 3) {
+                rgb[2] = 255 * x / WIDTH;
+            } else if(y < HEIGHT / 3 * 2) {
+                rgb[1] = 255 * x / WIDTH;
             } else {
-                rgb[0] = 255 * x / 800;
+                rgb[0] = 255 * x / WIDTH;
             }
             if(bytes_per_pixel == 3) {
                 target[2] = rgb[2];
@@ -395,19 +398,19 @@ void copy_pepe(volatile uint8_t * const target) {
     uint8_t * src = (uint8_t *)pepe;
     
     if(bytes_per_pixel == 1) {
-        for(int i = 0; i < 800 * 600; i++) {
+        for(int i = 0; i < WIDTH * HEIGHT; i++) {
             rgb888_to_rgb332(src, dst);
             dst += 1;
             src += 3;
         }
     } else if(bytes_per_pixel == 2) {
-        for(int i = 0; i < 800 * 600; i++) {
+        for(int i = 0; i < WIDTH * HEIGHT; i++) {
             rgb888_to_rgb565(src, dst);
             dst += 2;
             src += 3;
         }
     } else {
-        for(int i = 0; i < 800 * 600 * 3; i++) {
+        for(int i = 0; i < WIDTH * HEIGHT * 3; i++) {
             *dst = *src;
             dst += 1;
             src += 1;
@@ -430,19 +433,19 @@ void init_memory(volatile uint8_t * const target) {
         uint32_t rgb;
         uint8_t * src = (uint8_t*)&rgb;
         if(bytes_per_pixel == 1) {
-            for(int i = 0; i < 800 * 600; i++) {
+            for(int i = 0; i < WIDTH * HEIGHT; i++) {
                 rgb = i;
                 rgb888_to_rgb332(src, dst);
                 dst += 1;
             }
         } else if(bytes_per_pixel == 2) {
-            for(int i = 0; i < 800 * 600; i++) {
+            for(int i = 0; i < WIDTH * HEIGHT; i++) {
                 rgb = i;
                 rgb888_to_rgb565(src, dst);
                 dst += 2;
             }
         } else {
-            for(int i = 0; i < 800 * 600; i++) {
+            for(int i = 0; i < WIDTH * HEIGHT; i++) {
                 dst[2] = i % 0x100;
                 dst[1] = i % 0x10000;
                 dst[0] = i % 0x1000000;
@@ -468,7 +471,7 @@ void set_text(volatile uint16_t * target, char * text, int row) {
     fence();
 }
 
-char* into_str(char* d, uint32_t s) {
+char* into_str_safe(char* d, uint32_t s) {
     int i = 0;
     d[i++] = (s / 1000000000) % 10 + '0';
     d[i++] = (s / 100000000) % 10 + '0';
@@ -483,7 +486,7 @@ char* into_str(char* d, uint32_t s) {
     return d;
 }
 
-char* into_str16(char* d, uint32_t s) {
+char* into_str16_safe(char* d, uint32_t s) {
     int i = 0;
     uint8_t ch[] = {'0', '1', '2', '3', '4', '5', '6', '7', '8', '9', 'a', 'b', 'c', 'd', 'e', 'f'};
     d[i++] = ch[(s / 0x10000000) % 0x10];
@@ -498,37 +501,35 @@ char* into_str16(char* d, uint32_t s) {
     return d;
 }
 
-/*
 char* into_str(uint32_t s) {
-    static char[] d = "0000000000";
-    return into_str_safe(d, s);
+    static char buff[] = "0000000000";
+    return into_str_safe(buff, s);
 }
 
 char* into_str16(uint32_t s) {
     static char buff16[] = "00112233";
-    return into_str16_safe(d, s);
+    return into_str16_safe(buff16, s);
 }
-*/
+
+
 void write_params_to_screen(volatile uint16_t* const dest) {
-    char buff[]   = "0000000000";
-    char buff16[] = "00112233";
     int i = 1;
-    set_text(dest, "ptrq: ", i); set_text(dest + 10, into_str(buff, *reg32(AXI2HDMI_BASE, POINTERQ)), i++);
-    set_text(dest, "ptot: ", i); set_text(dest + 10, into_str(buff, *reg32(AXI2HDMI_BASE, H_VTOT)), i++);
-    set_text(dest, "pact: ", i); set_text(dest + 10, into_str(buff, *reg32(AXI2HDMI_BASE, H_VACTIVE)), i++);
-    set_text(dest, "fron: ", i); set_text(dest + 10, into_str(buff, *reg32(AXI2HDMI_BASE, H_VFRONT)), i++);
-    set_text(dest, "sync: ", i); set_text(dest + 10, into_str(buff, *reg32(AXI2HDMI_BASE, H_VSYNC)), i++);
+    set_text(dest, "ptrq: ", i); set_text(dest + 10, into_str(*reg32(AXI2HDMI_BASE, POINTERQ)), i++);
+    set_text(dest, "ptot: ", i); set_text(dest + 10, into_str(*reg32(AXI2HDMI_BASE, H_VTOT)), i++);
+    set_text(dest, "pact: ", i); set_text(dest + 10, into_str(*reg32(AXI2HDMI_BASE, H_VACTIVE)), i++);
+    set_text(dest, "fron: ", i); set_text(dest + 10, into_str(*reg32(AXI2HDMI_BASE, H_VFRONT)), i++);
+    set_text(dest, "sync: ", i); set_text(dest + 10, into_str(*reg32(AXI2HDMI_BASE, H_VSYNC)), i++);
 
-    set_text(dest, "pwrr: ", i);set_text(dest + 10, into_str(buff, *reg32(AXI2HDMI_BASE, POWERREG)), i++);
-    set_text(dest, "cptr: ", i);set_text(dest + 10, into_str(buff, *reg32(AXI2HDMI_BASE, CURRENT_PTR)), i++);
-    set_text(dest, "txtb: ", i);set_text(dest + 10, into_str(buff, *reg32(AXI2HDMI_BASE, TEXT_BUFF_PARA)), i++);
-    set_text(dest, "curs: ", i);set_text(dest + 10, into_str(buff, *reg32(AXI2HDMI_BASE, CURSOR_FONT_PARA)), i++);
-    set_text(dest, "thrs: ", i);set_text(dest + 10, into_str(buff, *reg32(AXI2HDMI_BASE, FIFO_REFILL_THRESHOLD)), i++);
+    set_text(dest, "pwrr: ", i);set_text(dest + 10, into_str(*reg32(AXI2HDMI_BASE, POWERREG)), i++);
+    set_text(dest, "cptr: ", i);set_text(dest + 10, into_str(*reg32(AXI2HDMI_BASE, CURRENT_PTR)), i++);
+    set_text(dest, "txtb: ", i);set_text(dest + 10, into_str(*reg32(AXI2HDMI_BASE, TEXT_BUFF_PARA)), i++);
+    set_text(dest, "curs: ", i);set_text(dest + 10, into_str(*reg32(AXI2HDMI_BASE, CURSOR_FONT_PARA)), i++);
+    set_text(dest, "thrs: ", i);set_text(dest + 10, into_str(*reg32(AXI2HDMI_BASE, FIFO_REFILL_THRESHOLD)), i++);
 
-    set_text(dest, "mlen: ", i);set_text(dest + 10, into_str(buff, *reg32(AXI2HDMI_BASE, FIFO_MAX_REFILL_AMOUNT)), i++);
-    set_text(dest, "pfor: ", i);set_text(dest + 10, into_str16(buff16, *reg32(AXI2HDMI_BASE, PIXEL_FORMAT)), i++);
+    set_text(dest, "mlen: ", i);set_text(dest + 10, into_str(*reg32(AXI2HDMI_BASE, FIFO_MAX_REFILL_AMOUNT)), i++);
+    set_text(dest, "pfor: ", i);set_text(dest + 10, into_str16(*reg32(AXI2HDMI_BASE, PIXEL_FORMAT)), i++);
 
-    set_text(dest, "serr: ", i);set_text(dest + 10, into_str16(buff16, *reg32(AXI2HDMI_BASE, SYNC_FAIL_HAPPENED)), i++);
+    set_text(dest, "serr: ", i);set_text(dest + 10, into_str16(*reg32(AXI2HDMI_BASE, SYNC_FAIL_HAPPENED)), i++);
 
     dest[(selected_offset / 8 + 1) * cols] = 0x5f00 | '>';
 }
@@ -552,9 +553,8 @@ void trap_vector(void) {
 }
 
 void printstr(char const * const str) {
-    int len = 0;
     char const * tmp = str;
     while(*tmp != 0) tmp++;
-    uart_write_str(&__base_uart, str, tmp-str);
+    uart_write_str(&__base_uart, (char*)str, tmp-str);
     uart_write_flush(&__base_uart);
 }
