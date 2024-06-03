@@ -216,6 +216,13 @@ uint32_t start_peripheral(uint32_t* const err, uint32_t ptr) {
     return 0;
 }
 
+void toggle_mode() {
+    is_in_text_mode = !is_in_text_mode;
+
+    *reg32(AXI2HDMI_BASE, POWERREG) = (1 | (is_in_text_mode << 16));
+    *reg32(AXI2HDMI_BASE, POINTERQ) = ((uint32_t)(uint64_t)arr) | 0b110;
+}
+
 rgb_t hsv2rgb(hsv_t in) {
     float      hh, p, q, t, ff;
     long        i;

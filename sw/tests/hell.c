@@ -42,11 +42,7 @@ void interactive(uint32_t rtc_freq) {
                     selected_offset %= 0x68;
                     break;
                 case 'T':
-                    //Stop hold mode
-                    is_in_text_mode = !is_in_text_mode;
-
-                    *reg32(AXI2HDMI_BASE, POWERREG) = (1 | (is_in_text_mode << 16));
-                    *reg32(AXI2HDMI_BASE, POINTERQ) = ((uint32_t)(uint64_t)arr) | 0b110;
+                    toggle_mode();
                     break;
                 case 'M': 
                     init_memory(arr);
@@ -81,6 +77,12 @@ void interactive(uint32_t rtc_freq) {
                     break;
                 case 'F':
                     printstr(into_str(arctan2(50, 70) * 1000));
+                    break;
+                case 'V':
+                    uint32_t res = check_res(rtc_freq); 
+                    printstr("Result of perf test: ");
+                    printstr(into_str(res));
+                    printstr("\r\n");
                     break;
                 default: break;
             }

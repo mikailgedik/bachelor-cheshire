@@ -1,5 +1,36 @@
-#define MIN_QUEUE_LEN 1
-#define MAX_QUEUE_LEN 4
+#define MIN_THRESHOLD 2
+#define MIN_QUEUE_LEN 2
+#define MAX_QUEUE_LEN 24
+
+//Returns 0 if the frame is not displayable at all
+//1 if displayable without load
+//Any other number represents the time it takes to finish the memory testing
+uint32_t check_res(uint32_t rtc_freq) {
+    uint32_t millis_per_frame = 17;
+    volatile uint32_t * const fail = reg32(AXI2HDMI_BASE, SYNC_FAIL_HAPPENED);
+    //Wait for new settings to take effect on a few frames -> old frames might re-trigger and takes a while to adjust
+    sleep_intr(rtc_freq * 30 * millis_per_frame / 1000);
+    //Reset fail state
+    fence();
+    *fail = 0;
+    //Fences just to be sure?
+    fence();
+    sleep_intr(rtc_freq * 30 * millis_per_frame / 1000);
+    fence();
+    if (*fail != 0) {
+        return 1;
+    }
+
+    uint64_t time = clint_get_mtime();
+    stress_ram(0x10);
+    time = clint_get_mtime() - time;
+    
+    if (*fail != 0) {
+        return 2;
+    } else {
+        return time;
+    }
+}
 
 void automatic_tester(uint32_t rtc_freq) {
     uint32_t millis_per_frame = 17;
@@ -11,52 +42,36 @@ void automatic_tester(uint32_t rtc_freq) {
         }
     }
 
-    for(int queue_len = 1; queue_len < MAX_QUEUE_LEN + 1; queue_len++) {
-        for(int threshold = 1; threshold < queue_len; threshold++) {
+    for(int queue_len = MIN_QUEUE_LEN; queue_len < MAX_QUEUE_LEN + 1; queue_len++) {
+        for(int threshold = MIN_THRESHOLD; threshold < queue_len + 1; threshold++) {
+            uint32_t refill_amount = queue_len - (threshold - 1);
             *reg32(AXI2HDMI_BASE, FIFO_REFILL_THRESHOLD) = threshold;
-            *reg32(AXI2HDMI_BASE, FIFO_MAX_REFILL_AMOUNT) = queue_len - threshold;
-            //Wait 10 frames before clearing the error status
-            sleep_intr(rtc_freq * 10 * millis_per_frame / 1000);
-            *reg32(AXI2HDMI_BASE, SYNC_FAIL_HAPPENED) = 0;
+            *reg32(AXI2HDMI_BASE, FIFO_MAX_REFILL_AMOUNT) = refill_amount;
+            
+            uint32_t result = check_res(rtc_freq);
+            
+            printstr("Settings t=");
+            printstr(into_str(threshold));
+            printstr("; q=");
+            printstr(into_str(queue_len));
+            printstr("; r=");
+            printstr(into_str(refill_amount));
 
-            fence();
-            printstr(into_str(*reg32(AXI2HDMI_BASE, SYNC_FAIL_HAPPENED)));
 
-            //Wait for one second to check wether this works
-            sleep_intr(rtc_freq * 120 * millis_per_frame / 1000);
-            if(*reg32(AXI2HDMI_BASE, SYNC_FAIL_HAPPENED) != 0) {
-                data[queue_len][threshold] = 1;
-                printstr("Settings t=");
-                printstr(into_str(threshold));
-                printstr("; q=");
-                printstr(into_str(queue_len));
-                printstr(" failed immediately\r\n");
-                continue;
-            } else {
-                data[queue_len][threshold] = 2;
+            data[queue_len][threshold] = result;
+            switch(result) {
+                case 1:
+                    printstr(" failed immediately\r\n");
+                    break;
+                case 2:
+                    printstr(" failed under stress\r\n");
+                    break;
+                default:
+                    printstr(" OK: ");
+                    printstr(into_str(result));
+                    printstr("\r\n");
+                    break;
             }
-
-            /*
-            uint64_t time = clint_get_mtime();
-            stress_ram(0x10);
-            time = clint_get_mtime() - time;
-
-            if(*reg32(AXI2HDMI_BASE, SYNC_FAIL_HAPPENED) != 0) {
-                data[queue_len][threshold] = 2;
-                printstr("Settings t=");
-                printstr(into_str(threshold));
-                printstr("; q=");
-                printstr(into_str(queue_len));
-                printstr(" failed under stress\r\n");
-            } else {
-                data[queue_len][threshold] = time / 1000;
-                printstr("Settings t=");
-                printstr(into_str(threshold));
-                printstr("; q=");
-                printstr(into_str(queue_len));
-                printstr(" OK\r\n");
-            }
-            */
         }
     }
 
